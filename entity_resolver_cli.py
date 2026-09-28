@@ -8,6 +8,7 @@ Modes Available:
   2. Batch Test Dataset Mode: Run full high-speed inference on test_source*.tsv.
 
 Features:
+- Zero Retraining: Automatically detects and reuses any existing LightGBM .pkl models
 - NLP Normalization (Indian Legal Suffixes + Address Expansions + Unicode NFKD)
 - Sublinear TF-IDF + Character 3-gram Candidate Blocking
 - Pre-Tokenized Fast Feature Extractor (No string splitting in inner loops)
@@ -214,21 +215,72 @@ def compute_macro_f05(preds_dict, gt_dict, all_s1_ids):
     }
 
 # ------------------------------------------------------------------------------
-# SECTION 3: MODEL TRAINING / CHECKPOINT MANAGER
+# SECTION 3: MODEL & VECTORIZER DISCOVERY / REUSE
 # ------------------------------------------------------------------------------
+def find_existing_model():
+    """
+    Searches known checkpoint directories across Kaggle, Colab, and local workspace for any existing model pkl.
+    """
+    candidate_paths = [
+        MODEL_CHECKPOINT,
+        "checkpoints_india/lightgbm_india_model.pkl",
+        "checkpoints/lightgbm_india_model.pkl",
+        "checkpoints/lightgbm_model.pkl",
+        "/kaggle/working/checkpoints/lightgbm_model.pkl",
+        "/kaggle/working/checkpoints_india/lightgbm_india_model.pkl",
+        "/kaggle/working/lightgbm_model.pkl",
+        "/content/checkpoints/lightgbm_model.pkl",
+        "/content/checkpoints_india/lightgbm_india_model.pkl",
+        "lightgbm_india_model.pkl",
+        "lightgbm_model.pkl",
+    ]
+    for p in candidate_paths:
+        if os.path.exists(p):
+            return p
+    return None
+
+def build_or_load_vectorizer():
+    """
+    Loads saved vectorizer or quickly fits a sublinear TF-IDF vectorizer without full model training.
+    """
+    if os.path.exists(VECTORIZER_CHECKPOINT):
+        with open(VECTORIZER_CHECKPOINT, 'rb') as f:
+            return pickle.load(f)
+
+    print("Fitting fast sublinear TF-IDF blocking vectorizer...")
+    sample_texts = []
+    data_dir = TEST_DIR if os.path.exists(TEST_DIR) else TRAIN_DIR
+    prefix = "test_" if data_dir == TEST_DIR else "train_"
+    
+    for fname in [f"{prefix}source1.tsv", f"{prefix}source2.tsv", f"{prefix}source3.tsv"]:
+        fpath = os.path.join(data_dir, fname)
+        if os.path.exists(fpath):
+            for chunk in pd.read_csv(fpath, sep="\t", chunksize=50000):
+                sub = chunk[chunk['country'] == TARGET_COUNTRY] if 'country' in chunk.columns else chunk
+                if len(sub) > 0:
+                    names = sub['business_name'].apply(normalize_text)
+                    addrs = sub['business_address'].apply(lambda x: normalize_text(x, is_address=True))
+                    sample_texts.extend((names + " " + addrs).tolist())
+                if len(sample_texts) >= 120000:
+                    break
+                    
+    vec = TfidfVectorizer(ngram_range=(1, 2), analyzer='word', max_features=70000, sublinear_tf=True)
+    vec.fit(sample_texts)
+    with open(VECTORIZER_CHECKPOINT, 'wb') as f:
+        pickle.dump(vec, f)
+    print(f"💾 Saved TF-IDF Vectorizer to {VECTORIZER_CHECKPOINT}")
+    return vec
+
 def load_or_train_model():
     """
-    Loads saved model & TF-IDF artifacts or trains a new LightGBM classifier with offline validation.
+    Loads saved model & TF-IDF artifacts. Reuses existing model pkl from Kaggle/Colab without retraining.
     """
-    if os.path.exists(MODEL_CHECKPOINT) and os.path.exists(METRICS_CHECKPOINT) and os.path.exists(VECTORIZER_CHECKPOINT):
-        print(f"🔄 Loaded existing model checkpoint from: {MODEL_CHECKPOINT}")
-        with open(MODEL_CHECKPOINT, 'rb') as f:
+    existing_model_path = find_existing_model()
+    if existing_model_path:
+        print(f"🔄 Reusing existing trained model checkpoint from: {existing_model_path}")
+        with open(existing_model_path, 'rb') as f:
             clf = pickle.load(f)
-        with open(VECTORIZER_CHECKPOINT, 'rb') as f:
-            vec = pickle.load(f)
-        with open(METRICS_CHECKPOINT, 'r') as f:
-            metrics = json.load(f)
-        print(f"📊 Validated Performance (India Split): Macro F_0.5 = {metrics['macro_f05']:.4f} | Precision = {metrics['mean_precision']:.4f} | Recall = {metrics['mean_recall']:.4f}")
+        vec = build_or_load_vectorizer()
         return clf, vec
 
     print("\n" + "="*70)
@@ -348,13 +400,11 @@ def load_or_train_model():
     )
     clf.fit(X_train, y_train)
 
-    # Save model and vectorizer
     with open(MODEL_CHECKPOINT, 'wb') as f:
         pickle.dump(clf, f)
     with open(VECTORIZER_CHECKPOINT, 'wb') as f:
         pickle.dump(vec, f)
 
-    # Validation Evaluation
     print("Evaluating model performance on held-out validation split...")
     val_preds_dict = defaultdict(list)
     for start in range(0, len(val_idx), batch_size):
@@ -413,7 +463,7 @@ def load_or_train_model():
     return clf, vec
 
 # ------------------------------------------------------------------------------
-# SECTION 4: TARGET CORPOUS BUILDER (FOR INTERACTIVE SEARCH)
+# SECTION 4: TARGET CORPUS BUILDER (FOR INTERACTIVE SEARCH)
 # ------------------------------------------------------------------------------
 def load_or_build_interactive_target_pool(vec):
     """
@@ -426,7 +476,6 @@ def load_or_build_interactive_target_pool(vec):
 
     print("\n⏳ Building Indexed Target Corpus (Source 2 & Source 3) for Interactive Testing...")
     tgt_rows = []
-    # Load from test set if available, else from train set
     data_source_dir = TEST_DIR if os.path.exists(TEST_DIR) else TRAIN_DIR
     prefix = "test_" if data_source_dir == TEST_DIR else "train_"
     
@@ -434,7 +483,7 @@ def load_or_build_interactive_target_pool(vec):
         fpath = os.path.join(data_source_dir, fname)
         if os.path.exists(fpath):
             for chunk in pd.read_csv(fpath, sep="\t", chunksize=100000):
-                sub = chunk[chunk['country'] == TARGET_COUNTRY]
+                sub = chunk[chunk['country'] == TARGET_COUNTRY] if 'country' in chunk.columns else chunk
                 if len(sub) > 0:
                     tgt_rows.append(sub)
     
@@ -694,7 +743,7 @@ def run_batch_test_mode(clf, vec):
         s1_rows, tgt_rows = [], []
         
         for chunk in pd.read_csv(os.path.join(TEST_DIR, "test_source1.tsv"), sep="\t", chunksize=100000):
-            sub = chunk[chunk['country'] == TARGET_COUNTRY]
+            sub = chunk[chunk['country'] == TARGET_COUNTRY] if 'country' in chunk.columns else chunk
             if len(sub) > 0:
                 s1_rows.append(sub)
         df_s1_te = pd.concat(s1_rows, ignore_index=True) if s1_rows else pd.DataFrame()
@@ -703,7 +752,7 @@ def run_batch_test_mode(clf, vec):
         
         for fname in ["test_source2.tsv", "test_source3.tsv"]:
             for chunk in pd.read_csv(os.path.join(TEST_DIR, fname), sep="\t", chunksize=100000):
-                sub = chunk[chunk['country'] == TARGET_COUNTRY]
+                sub = chunk[chunk['country'] == TARGET_COUNTRY] if 'country' in chunk.columns else chunk
                 if len(sub) > 0:
                     tgt_rows.append(sub)
         df_tgt_te = pd.concat(tgt_rows, ignore_index=True) if tgt_rows else pd.DataFrame()
@@ -815,7 +864,7 @@ def run_batch_test_mode(clf, vec):
     print("="*70)
     s1_india_full = []
     for chunk in pd.read_csv(os.path.join(TEST_DIR, "test_source1.tsv"), sep="\t", chunksize=100000):
-        sub = chunk[chunk['country'] == TARGET_COUNTRY]
+        sub = chunk[chunk['country'] == TARGET_COUNTRY] if 'country' in chunk.columns else chunk
         if len(sub) > 0:
             s1_india_full.extend(sub['entity_id'].tolist())
 
@@ -849,7 +898,6 @@ def main():
     print("🚀 Initializing NLP Business Entity Resolution Engine (India Partition)...")
     clf, vec = load_or_train_model()
     
-    # Check CLI arguments: default is interactive mode
     if len(sys.argv) > 1 and sys.argv[1].lower() in ["--batch", "-b", "--test"]:
         run_batch_test_mode(clf, vec)
     else:
