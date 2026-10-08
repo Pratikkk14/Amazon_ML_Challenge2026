@@ -66,19 +66,20 @@ Before vectorization, all strings undergo aggressive linguistic standardization:
 ### Stage 2: Pre-Tokenized Pairwise Feature Engineering
 For every candidate pair $(s_1, t)$, an **11-dimensional feature vector** is computed:
 
-| Feature Name | Description | Rationale |
-| :--- | :--- | :--- |
-| `tfidf_sim` | Cosine similarity in TF-IDF sparse space | Global lexical similarity |
-| `name_jac` | Word-level Token Jaccard Similarity | Word-overlap regardless of word order |
-| `addr_jac` | Address-level Token Jaccard Similarity | Landmark & locality match |
-| `name_ngram` | Character 3-Gram Jaccard Index | Typo and spelling mistake tolerance |
-| `addr_ngram` | Address Character 3-Gram Jaccard Index | Address transliteration match |
-| `overlap_tokens` | Absolute count of overlapping tokens | Raw token overlap strength |
-| `len_ratio_name` | Length ratio $\frac{\min(|s_1|, |t|)}{\max(|s_1|, |t|)}$ | Catches partial sub-brand names |
-| `exact_name` | Binary indicator ($s_1 == t$) | Direct exact name matches |
-| `exact_addr` | Binary indicator ($s_1 == t$) | Direct exact address matches |
-| `addr_missing` | Binary indicator (either address is empty) | Guards against empty address traps |
-| `is_substr` | Binary indicator for substring containment | Acronyms and brand extensions |
+| Feature Name     | Description                                | Rationale                          |
+| :--------------- | :----------------------------------------- | :--------------------------------- |
+| `tfidf_sim`      | Cosine similarity in TF-IDF sparse space   | Global lexical similarity          |
+| `name_jac`       | Word-level Token Jaccard Similarity        | Word-overlap regardless of word order |
+| `addr_jac`       | Address-level Token Jaccard Similarity     | Landmark & locality match          |
+| `name_ngram`     | Character 3-Gram Jaccard Index             | Typo and spelling mistake tolerance |
+| `addr_ngram`     | Address Character 3-Gram Jaccard Index     | Address transliteration match      |
+| `overlap_tokens` | Absolute count of overlapping tokens       | Raw token overlap strength         |
+<!-- | `len_ratio_name` | Length ratio (\(\frac{\min(|s_1|, |t|)}{\max(|s_1|, |t|)}\)) | Catches partial sub-brand names | -->
+| `exact_name`     | Binary indicator (\(s_1 == t\))            | Direct exact name matches          |
+| `exact_addr`     | Binary indicator (\(s_1 == t\))            | Direct exact address matches       |
+| `addr_missing`   | Binary indicator (either address is empty) | Guards against empty address traps |
+| `is_substr`      | Binary indicator for substring containment | Acronyms and brand extensions      |
+
 
 ---
 
@@ -114,10 +115,21 @@ $$F_{0.5} = \frac{1.25 \times \text{Precision} \times \text{Recall}}{0.25 \times
 ## 📁 6. Repository File Structure
 
 ```text
-├── MLV1.ipynb                     # High-Speed End-to-End Jupyter Notebook
+├── backend_server.py              # Flask Backend API Server with Dual-Model Engine
 ├── entity_resolver_cli.py         # Interactive CLI & Batch Inference Tool
+├── MLV1.ipynb                     # High-Speed End-to-End Jupyter Notebook
 ├── Technical_Methodology_Report.md# Detailed Academic Methodology & Math Report
 ├── README.md                      # Project Architecture & Overview (This file)
+├── sample_20_entities.tsv         # Benchmark Multi-Source Dataset Sample
+├── lightgbm_model.pkl             # Standalone LightGBM Model Weights
+│
+├── frontend/                      # Minimalistic Glassmorphism Web App (Vite + React)
+│   ├── src/
+│   │   ├── App.jsx                # Main Resolution Dashboard & Pairwise Model Inspector
+│   │   ├── index.css              # Custom Dark Theme & Design Token Tokens
+│   │   └── main.jsx               # React Entry Point
+│   ├── package.json
+│   └── vite.config.js
 │
 ├── checkpoints_india/             # Persistent Model & Checkpoint Artifacts
 │   ├── lightgbm_india_model.pkl   # Trained LightGBM Classifier
@@ -134,8 +146,40 @@ $$F_{0.5} = \frac{1.25 \times \text{Precision} \times \text{Recall}}{0.25 \times
 
 ## 🚀 7. How to Run
 
-### Mode A: Interactive CLI Mode (Default)
-Explore and test the entity resolution engine interactively:
+### Option 1: Modern Web UI & RoBERTa Dual-Model Dashboard (Recommended)
+
+Run the full web application featuring dual-model comparisons (**LightGBM** vs **RoBERTa Transformer**):
+
+#### Step 1: Start the Python Flask Backend API
+```bash
+# Activate your virtual environment (if applicable)
+.\myvenv\Scripts\activate
+
+# Launch Flask Server on http://127.0.0.1:5000
+python backend_server.py
+```
+> **Note:** Upon startup, the backend initializes the LightGBM classifier and attempts to load `sentence-transformers/all-distilroberta-v1`. If offline or missing dependencies, it smoothly uses the fallback vectorizer.
+
+#### Step 2: Start the React Frontend Dashboard
+In a separate terminal window:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Open **`http://localhost:5173`** in your browser to access the dashboard.
+
+#### Web Interface Features:
+* **Interactive Threshold Sliders:** Adjust LightGBM ($\tau$) and RoBERTa ($\tau$) thresholds in real time to filter matches.
+* **Cluster Drawer View:** View merged business entities vs. singletons with full source breakdowns ($S_1, S_2, S_3$).
+* **Pairwise Model Inspector:** Side-by-side probability comparison between LightGBM Tree probabilities and RoBERTa neural embedding similarities with consensus agreement tags (`AGREEMENT_MATCH`, `DISAGREEMENT_LGBM_ONLY`, etc.).
+* **Custom Record Entry:** Submit custom business names/addresses or load sample datasets (`sample_20_entities.tsv`).
+
+---
+
+### Option 2: Interactive CLI Mode
+
+Explore and test the entity resolution engine via command line:
 ```bash
 python entity_resolver_cli.py
 ```
@@ -144,11 +188,15 @@ python entity_resolver_cli.py
 * **Option 2:** Direct pairwise comparison between two custom records with full feature breakdown.
 * **Option 3:** 3-Source Triplet Verification ($S_1 \leftrightarrow S_2 \leftrightarrow S_3$).
 
-### Mode B: Batch Test Dataset Inference
+---
+
+### Option 3: Batch Test Dataset Inference
 Run the complete pipeline over `test_source*.tsv` to generate final TSVs:
 ```bash
 python entity_resolver_cli.py --batch
 ```
 
-### Mode C: Jupyter Notebook Execution
+---
+
+### Option 4: Jupyter Notebook Execution
 Open [`MLV1.ipynb`](file:///d:/Projects/Desktop/AmazonMLChallenge/MLV1.ipynb) in **Google Colab**, **Kaggle**, or **Local Jupyter** and execute all cells sequentially.

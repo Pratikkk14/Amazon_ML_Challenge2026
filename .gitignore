@@ -1,6 +1,32 @@
+# Virtual Environment & Python Cache
+myvenv/
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Heavy Binary Artifacts, Notebooks & Temporary Scripts
 Tensor_submission.zip
+student_resource/
+output_folder_1/
+output_india/
+update_nb3.py
+Documentation_template.md
+ML.ipynb
 MLV1.ipynb
 demo.py
-output_folder_1
-student_resource/
-__pycache__
+*.pkl
+*.zip
+*.tar.gz
+
+# Node / React Frontend Dependencies & Local Build Artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+.DS_Store
+Thumbs.db
