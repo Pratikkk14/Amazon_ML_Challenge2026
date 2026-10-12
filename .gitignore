@@ -18,6 +18,7 @@ ML.ipynb
 MLV1.ipynb
 demo.py
 *.pkl
+!lightgbm_model.pkl
 *.zip
 *.tar.gz
 
