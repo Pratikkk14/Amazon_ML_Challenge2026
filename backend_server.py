@@ -112,16 +112,20 @@ if os.path.exists(MODEL_PATH):
 else:
     print(f"[WARN] No pre-trained model found at {MODEL_PATH}. Running heuristic fallback.")
 
-# Try loading sentence-transformers or huggingface pipeline for RoBERTa embedding matching
+# Configure dedicated local directory to cache RoBERTa model weights permanently
+ROBERTA_MODEL_NAME = 'sentence-transformers/all-distilroberta-v1'
+ROBERTA_CACHE_DIR = os.path.join(os.path.dirname(__file__), 'checkpoints_india', 'roberta_model_cache')
+os.makedirs(ROBERTA_CACHE_DIR, exist_ok=True)
+
 ROBERTA_AVAILABLE = False
 roberta_model = None
 
 try:
     from sentence_transformers import SentenceTransformer, util
-    # Pre-load or initialize lightweight RoBERTa model for entity matching
-    roberta_model = SentenceTransformer('sentence-transformers/all-distilroberta-v1')
+    # Loads from local cache if already downloaded, otherwise downloads once and saves permanently
+    roberta_model = SentenceTransformer(ROBERTA_MODEL_NAME, cache_folder=ROBERTA_CACHE_DIR)
     ROBERTA_AVAILABLE = True
-    print("[OK] RoBERTa Transformer model successfully loaded (all-distilroberta-v1).")
+    print(f"[OK] RoBERTa Transformer model active ({ROBERTA_MODEL_NAME}) using cache: {ROBERTA_CACHE_DIR}")
 except Exception as e:
     print(f"[NOTE] RoBERTa transformer engine notice: {e}")
     print("[INFO] Fallback RoBERTa vectorizer initialized for neural similarity scoring.")
