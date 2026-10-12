@@ -186,28 +186,10 @@ def compute_pair_similarity(rec_a, rec_b):
     else:
         lgbm_prob = float(0.5 * feats[1] + 0.3 * feats[3] + 0.2 * tfidf_sim)
 
-    # 2. RoBERTa Transformer Similarity
+    # 2. RoBERTa / Transformer Semantic Similarity
     roberta_sim = compute_roberta_similarity(a_text, b_text)
 
-    # 3. Dynamic Model Ensemble Comparison & Final Consensus Decision
-    # Thresholds: tau for LightGBM, 0.68 for RoBERTa embedding similarity
-    roberta_tau = 0.68
-    lgbm_match = lgbm_prob >= DECISION_TAU
-    roberta_match = roberta_sim >= roberta_tau
-
-    # Combined final probability takes the maximum confidence agreement (or weighted average)
-    final_prob = float(max(lgbm_prob, 0.70 * roberta_sim + 0.30 * lgbm_prob))
-    final_match = final_prob >= DECISION_TAU
-
-    if lgbm_match and roberta_match:
-        consensus_status = "AGREEMENT_MATCH"
-    elif not lgbm_match and not roberta_match:
-        consensus_status = "AGREEMENT_NO_MATCH"
-    elif lgbm_match and not roberta_match:
-        consensus_status = "DISAGREEMENT_LGBM_ONLY"
-    else:
-        consensus_status = "DISAGREEMENT_ROBERTA_ONLY"
-
+    # Return base metrics for flexible ensemble computation
     feat_dict = {
         "tfidf_sim": round(tfidf_sim, 4),
         "name_jaccard": round(feats[1], 4),
@@ -218,14 +200,54 @@ def compute_pair_similarity(rec_a, rec_b):
         "exact_addr": bool(feats[8]),
         "is_substr": bool(feats[10]),
         "lgbm_prob": round(lgbm_prob, 4),
-        "roberta_sim": round(roberta_sim, 4),
-        "consensus_status": consensus_status
+        "roberta_sim": round(roberta_sim, 4)
     }
 
-    return final_prob, lgbm_prob, roberta_sim, feat_dict, {
+    return lgbm_prob, roberta_sim, feat_dict, {
         "a_normalized": {"name": a_n, "addr": a_a},
         "b_normalized": {"name": b_n, "addr": b_a}
     }
+
+def combine_predictions(lgbm_prob, roberta_sim, tau, roberta_tau, ensemble_strategy="weighted"):
+    """
+    Ensemble decision layer combining LightGBM tree probabilities with RoBERTa embeddings:
+    - 'weighted': Soft voting blend (65% LightGBM + 35% RoBERTa)
+    - 'consensus': Strict intersection (Both must exceed their respective thresholds)
+    - 'voting': Majority / Union voting (Either model detects a confident match)
+    - 'cascade': Cascading re-ranking (LightGBM candidate filter, RoBERTa disambiguation in borderline zone)
+    """
+    lgbm_match = lgbm_prob >= tau
+    roberta_match = roberta_sim >= roberta_tau
+
+    if ensemble_strategy == "consensus":
+        # Conservative agreement - guarantees high precision for Macro F0.5
+        final_prob = float(min(lgbm_prob, roberta_sim))
+        is_match = lgbm_match and roberta_match
+    elif ensemble_strategy == "voting":
+        # Optimistic union voting - higher recall
+        final_prob = float(max(lgbm_prob, roberta_sim))
+        is_match = lgbm_match or roberta_match
+    elif ensemble_strategy == "cascade":
+        # Borderline Disambiguation Zone: if LightGBM is near the margin (0.50 - 0.75), let RoBERTa resolve
+        if 0.50 <= lgbm_prob <= 0.78:
+            final_prob = float(0.40 * lgbm_prob + 0.60 * roberta_sim)
+        else:
+            final_prob = float(0.85 * lgbm_prob + 0.15 * roberta_sim)
+        is_match = final_prob >= tau
+    else: # 'weighted' default
+        final_prob = float(0.65 * lgbm_prob + 0.35 * roberta_sim)
+        is_match = final_prob >= tau
+
+    if lgbm_match and roberta_match:
+        consensus_status = "AGREEMENT_MATCH"
+    elif not lgbm_match and not roberta_match:
+        consensus_status = "AGREEMENT_NO_MATCH"
+    elif lgbm_match and not roberta_match:
+        consensus_status = "DISAGREEMENT_LGBM_ONLY"
+    else:
+        consensus_status = "DISAGREEMENT_ROBERTA_ONLY"
+
+    return final_prob, is_match, lgbm_match, roberta_match, consensus_status
 
 class UnionFind:
     def __init__(self, n):
@@ -275,6 +297,7 @@ def resolve_entities():
     records = data.get("records", [])
     tau = float(data.get("threshold", DECISION_TAU))
     roberta_tau = float(data.get("roberta_threshold", 0.68))
+    strategy = data.get("strategy", "weighted") # 'weighted' | 'consensus' | 'voting' | 'cascade'
 
     if not records or len(records) < 2:
         return jsonify({"error": "At least 2 records are required for entity resolution."}), 400
@@ -285,14 +308,14 @@ def resolve_entities():
 
     for i in range(n):
         for j in range(i + 1, n):
-            final_prob, lgbm_prob, roberta_sim, feat_dict, norm_info = compute_pair_similarity(records[i], records[j])
+            lgbm_prob, roberta_sim, feat_dict, norm_info = compute_pair_similarity(records[i], records[j])
             
-            # Evaluate match according to thresholds
-            lgbm_is_match = lgbm_prob >= tau
-            roberta_is_match = roberta_sim >= roberta_tau
+            final_prob, is_match, lgbm_is_match, roberta_is_match, consensus_status = combine_predictions(
+                lgbm_prob, roberta_sim, tau, roberta_tau, ensemble_strategy=strategy
+            )
             
-            # Final decision takes consensus / threshold
-            is_match = final_prob >= tau
+            feat_dict["consensus_status"] = consensus_status
+            
             if is_match:
                 uf.union(i, j)
             
@@ -311,7 +334,7 @@ def resolve_entities():
                 "lgbm_is_match": lgbm_is_match,
                 "roberta_is_match": roberta_is_match,
                 "is_match": is_match,
-                "consensus_status": feat_dict["consensus_status"],
+                "consensus_status": consensus_status,
                 "features": feat_dict,
                 "normalization": norm_info
             })
