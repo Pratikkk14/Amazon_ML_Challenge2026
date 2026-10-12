@@ -21,6 +21,9 @@ demo.py
 !lightgbm_model.pkl
 *.zip
 *.tar.gz
+*.safetensors
+*.bin
+checkpoints_india/roberta_model_cache/
 
 # Node / React Frontend Dependencies & Local Build Artifacts
 frontend/node_modules/
