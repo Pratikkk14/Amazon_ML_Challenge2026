@@ -1,0 +1,7 @@
+services:
+  entity-resolver:
+    build: .
+    ports:
+      - "5173:80"   # Web UI mapped to localhost:5173
+      - "5000:5000" # Flask API mapped to localhost:5000
+    restart: unless-stopped
