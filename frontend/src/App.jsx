@@ -3,19 +3,19 @@ import {
   Building2, 
   Layers, 
   ArrowRightLeft, 
-  Sparkles, 
   Sliders, 
   Trash2, 
   Plus, 
   FileText, 
-  CheckCircle2, 
-  HelpCircle,
-  ChevronDown,
-  ChevronRight,
-  GitMerge,
-  Info,
-  ExternalLink,
-  RotateCw
+  Check, 
+  Minus,
+  ChevronDown, 
+  ChevronRight, 
+  GitMerge, 
+  RotateCw,
+  Cpu,
+  ShieldCheck,
+  AlertTriangle
 } from 'lucide-react';
 
 const API_BASE = "http://127.0.0.1:5000/api";
@@ -34,21 +34,21 @@ export default function App() {
 
   const [threshold, setThreshold] = useState(0.72);
   const [robertaThreshold, setRobertaThreshold] = useState(0.68);
+  const [ensembleStrategy, setEnsembleStrategy] = useState('weighted'); // 'weighted' | 'consensus' | 'cascade' | 'voting'
   const [loading, setLoading] = useState(false);
   const [resolutionResult, setResolutionResult] = useState(null);
-  const [activeTab, setActiveTab] = useState('clusters'); // 'clusters' | 'pairwise' | 'input'
+  const [activeTab, setActiveTab] = useState('clusters'); // 'clusters' | 'pairwise'
   const [expandedEntities, setExpandedEntities] = useState({});
   const [selectedPair, setSelectedPair] = useState(null);
 
-  // New record input state
+  // New record input
   const [newSource, setNewSource] = useState('S1');
   const [newName, setNewName] = useState('');
   const [newAddr, setNewAddr] = useState('');
 
-  // Auto-resolve on initial mount
   useEffect(() => {
     handleResolve();
-  }, []);
+  }, [threshold, robertaThreshold, ensembleStrategy]);
 
   const handleResolve = async () => {
     if (records.length < 2) return;
@@ -60,13 +60,13 @@ export default function App() {
         body: JSON.stringify({
           records: records,
           threshold: threshold,
-          roberta_threshold: robertaThreshold
+          roberta_threshold: robertaThreshold,
+          strategy: ensembleStrategy
         })
       });
       const data = await res.json();
       if (res.ok) {
         setResolutionResult(data);
-        // Expand all merged clusters by default
         const initExpanded = {};
         data.entities.forEach(ent => {
           if (ent.is_merged) initExpanded[ent.entity_id] = true;
@@ -77,7 +77,7 @@ export default function App() {
         }
       }
     } catch (err) {
-      console.error("Failed to connect to backend", err);
+      console.error("Backend connection error:", err);
     } finally {
       setLoading(false);
     }
@@ -101,73 +101,74 @@ export default function App() {
   const addCustomRecord = (e) => {
     e.preventDefault();
     if (!newName.trim()) return;
-    const count = records.length + 1;
-    const formattedId = `${newSource}-${String(count).padStart(3, '0')}`;
-    setRecords([...records, { id: formattedId, name: newName.trim(), addr: newAddr.trim() }]);
+    const nextNum = records.length + 1;
+    const newId = `${newSource}-${String(nextNum).padStart(3, '0')}`;
+    setRecords([...records, { id: newId, name: newName.trim(), addr: newAddr.trim() }]);
     setNewName('');
     setNewAddr('');
   };
 
-  const removeRecord = (idx) => {
-    const updated = records.filter((_, i) => i !== idx);
-    setRecords(updated);
+  const removeRecord = (indexToRemove) => {
+    if (records.length <= 2) return;
+    setRecords(records.filter((_, idx) => idx !== indexToRemove));
   };
 
   const toggleExpand = (id) => {
     setExpandedEntities(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const getSourceBadge = (id = '') => {
-    if (id.startsWith('S1')) return <span className="badge badge-source1">Source 1</span>;
-    if (id.startsWith('S2')) return <span className="badge badge-source2">Source 2</span>;
-    if (id.startsWith('S3')) return <span className="badge badge-source3">Source 3</span>;
-    return <span className="badge badge-source1">{id}</span>;
+  const getSourceBadge = (id) => {
+    const isS1 = id.startsWith('S1');
+    const isS2 = id.startsWith('S2');
+    const badgeClass = isS1 ? 'sq-badge-src1' : isS2 ? 'sq-badge-src2' : 'sq-badge-src3';
+    return (
+      <span className={`sq-badge ${badgeClass}`}>
+        {isS1 ? 'SRC-1 (REF)' : isS2 ? 'SRC-2' : 'SRC-3'}
+      </span>
+    );
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Top Minimal Navigation Bar */}
-      <header style={{
-        borderBottom: '1px solid var(--border-subtle)',
-        padding: '14px 32px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        background: 'rgba(19, 21, 27, 0.7)',
-        backdropFilter: 'blur(12px)',
-        position: 'sticky',
-        top: 0,
-        zIndex: 50
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '8px',
-            background: 'linear-gradient(135deg, #6366f1, #a855f7)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#fff'
-          }}>
-            <GitMerge size={18} />
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-page)' }}>
+      
+      {/* 2D Minimalist AWS Builder Center Header */}
+      <header className="sq-card sq-border-b" style={{ padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: 'none', borderLeft: 'none', borderRight: 'none' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ width: '28px', height: '28px', background: '#ffffff', color: '#000000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '13px', fontFamily: 'var(--font-mono)' }}>
+            ER
           </div>
           <div>
-            <h1 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)', letterSpacing: '-0.2px' }}>
-              EntityResolver
-            </h1>
-            <p style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
-              LightGBM + Sublinear TF-IDF Multi-Source Resolution
-            </p>
+            <div style={{ fontSize: '13px', fontWeight: '700', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+              Entity Resolution System
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+              Dual Model Ensemble · LightGBM + RoBERTa Reranker
+            </div>
           </div>
         </div>
 
-        {/* Global Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-input)', padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-            <Sliders size={14} color="var(--text-muted)" />
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>LGBM τ:</span>
-            <span style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', fontWeight: '600', color: 'var(--accent-primary)', minWidth: '32px' }}>
+        {/* Action Controls & Parameter Sliders */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          
+          {/* Ensemble Strategy Selector */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#0a0a0a', border: '1px solid var(--border-light)', padding: '4px 8px' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>Ensemble:</span>
+            <select 
+              value={ensembleStrategy} 
+              onChange={(e) => setEnsembleStrategy(e.target.value)}
+              style={{ background: '#000000', color: '#ffffff', border: '1px solid var(--border-medium)', fontSize: '11px', padding: '3px 6px', outline: 'none', fontFamily: 'var(--font-mono)' }}
+            >
+              <option value="weighted">Weighted Fusion (65/35)</option>
+              <option value="cascade">Cascading Disambiguation</option>
+              <option value="consensus">Strict Agreement (Precision)</option>
+              <option value="voting">Union / Majority (Recall)</option>
+            </select>
+          </div>
+
+          {/* LightGBM Threshold */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#0a0a0a', border: '1px solid var(--border-light)', padding: '4px 8px' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>LGBM τ:</span>
+            <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', fontWeight: '700', minWidth: '28px' }}>
               {threshold.toFixed(2)}
             </span>
             <input 
@@ -177,14 +178,14 @@ export default function App() {
               step="0.02" 
               value={threshold} 
               onChange={(e) => setThreshold(parseFloat(e.target.value))}
-              style={{ width: '70px', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
+              style={{ width: '60px' }}
             />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-input)', padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-            <Sparkles size={14} color="#ec4899" />
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>RoBERTa τ:</span>
-            <span style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', fontWeight: '600', color: '#ec4899', minWidth: '32px' }}>
+          {/* RoBERTa Threshold */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#0a0a0a', border: '1px solid var(--border-light)', padding: '4px 8px' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>RoBERTa τ:</span>
+            <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', fontWeight: '700', minWidth: '28px' }}>
               {robertaThreshold.toFixed(2)}
             </span>
             <input 
@@ -194,123 +195,110 @@ export default function App() {
               step="0.02" 
               value={robertaThreshold} 
               onChange={(e) => setRobertaThreshold(parseFloat(e.target.value))}
-              style={{ width: '70px', accentColor: '#ec4899', cursor: 'pointer' }}
+              style={{ width: '60px' }}
             />
           </div>
 
-          <button 
-            className="btn-ghost"
-            onClick={loadSample20}
-            title="Load 20-record realistic multi-source sample dataset"
-          >
-            <FileText size={14} />
-            <span>Load 20-Entity Sample</span>
+          <button className="sq-btn-secondary" onClick={loadSample20}>
+            <FileText size={12} />
+            <span>Load 20-Sample</span>
           </button>
 
-          <button 
-            className="btn-primary"
-            onClick={handleResolve}
-            disabled={loading || records.length < 2}
-          >
-            <RotateCw size={14} className={loading ? 'animate-spin' : ''} />
-            <span>{loading ? 'Resolving...' : 'Run Resolution'}</span>
+          <button className="sq-btn-primary" onClick={handleResolve} disabled={loading}>
+            <RotateCw size={12} className={loading ? 'animate-spin' : ''} />
+            <span>{loading ? 'Evaluating...' : 'Resolve'}</span>
           </button>
         </div>
       </header>
 
-      {/* Main Workspace Layout */}
-      <main style={{ flex: 1, padding: '24px 32px', display: 'grid', gridTemplateColumns: '380px 1fr', gap: '24px', maxWidth: '1600px', width: '100%', margin: '0 auto' }}>
+      {/* Main 2D Grid Layout */}
+      <main style={{ flex: 1, padding: '20px 24px', display: 'grid', gridTemplateColumns: '360px 1fr', gap: '20px', maxWidth: '1680px', width: '100%', margin: '0 auto' }}>
         
-        {/* LEFT COLUMN: Input Entities Stream */}
-        <section style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div className="glass-panel" style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Layers size={16} color="var(--accent-primary)" />
-                <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)' }}>
-                  Active Records ({records.length})
-                </span>
+        {/* Left Column: Data Records Feed */}
+        <section style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div className="sq-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '8px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Active Records ({records.length})
               </div>
-              <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
-                Multi-Source Input
+              <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                MULTI-SOURCE STREAM
               </span>
             </div>
 
             {/* Quick Add Form */}
-            <form onSubmit={addCustomRecord} style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: 'var(--bg-input)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-              <div style={{ display: 'flex', gap: '8px' }}>
+            <form onSubmit={addCustomRecord} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ display: 'flex', gap: '6px' }}>
                 <select 
                   value={newSource} 
                   onChange={(e) => setNewSource(e.target.value)}
-                  style={{ background: 'var(--bg-card)', color: 'var(--text-main)', border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '6px 8px', fontSize: '12px', outline: 'none' }}
+                  style={{ background: '#000000', color: '#ffffff', border: '1px solid var(--border-medium)', padding: '5px 8px', fontSize: '11px', outline: 'none', fontFamily: 'var(--font-mono)' }}
                 >
-                  <option value="S1">Source 1 (Ref)</option>
-                  <option value="S2">Source 2</option>
-                  <option value="S3">Source 3</option>
+                  <option value="S1">S1</option>
+                  <option value="S2">S2</option>
+                  <option value="S3">S3</option>
                 </select>
                 <input 
                   type="text" 
-                  placeholder="Business Name..." 
+                  placeholder="Entity name..." 
                   value={newName} 
                   onChange={(e) => setNewName(e.target.value)}
-                  style={{ flex: 1, background: 'var(--bg-card)', color: 'var(--text-main)', border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '6px 10px', fontSize: '12px', outline: 'none' }}
+                  style={{ flex: 1, background: '#000000', color: '#ffffff', border: '1px solid var(--border-medium)', padding: '5px 8px', fontSize: '11px', outline: 'none' }}
                 />
               </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '6px' }}>
                 <input 
                   type="text" 
-                  placeholder="Address (e.g., Electronics City, Bangalore)..." 
+                  placeholder="Business address..." 
                   value={newAddr} 
                   onChange={(e) => setNewAddr(e.target.value)}
-                  style={{ flex: 1, background: 'var(--bg-card)', color: 'var(--text-main)', border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '6px 10px', fontSize: '12px', outline: 'none' }}
+                  style={{ flex: 1, background: '#000000', color: '#ffffff', border: '1px solid var(--border-medium)', padding: '5px 8px', fontSize: '11px', outline: 'none' }}
                 />
-                <button type="submit" className="btn-primary" style={{ padding: '6px 12px' }}>
-                  <Plus size={14} />
+                <button type="submit" className="sq-btn-secondary" style={{ padding: '5px 10px' }}>
+                  <Plus size={12} />
                   <span>Add</span>
                 </button>
               </div>
             </form>
 
-            {/* Records List */}
-            <div className="subtle-scroll" style={{ maxHeight: 'calc(100vh - 360px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }}>
+            {/* Records Stream */}
+            <div className="sq-scroll" style={{ maxHeight: 'calc(100vh - 350px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', paddingRight: '2px' }}>
               {records.map((rec, i) => (
                 <div 
                   key={i}
                   style={{
-                    background: 'var(--bg-card-subtle)',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: '8px',
-                    padding: '10px 12px',
+                    background: '#0d0d0d',
+                    border: '1px solid var(--border-light)',
+                    padding: '8px 10px',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'flex-start',
-                    gap: '10px',
-                    transition: 'border-color 0.15s ease'
+                    gap: '8px'
                   }}
                 >
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', overflow: 'hidden' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       {getSourceBadge(rec.id)}
-                      <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-dim)' }}>
+                      <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                         {rec.id}
                       </span>
                     </div>
-                    <span style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '600', color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {rec.name}
-                    </span>
+                    </div>
                     {rec.addr && (
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {rec.addr}
-                      </span>
+                      </div>
                     )}
                   </div>
 
                   <button 
                     onClick={() => removeRecord(i)}
-                    style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '4px', borderRadius: '4px' }}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: '2px' }}
                     title="Remove record"
                   >
-                    <Trash2 size={13} />
+                    <Trash2 size={12} />
                   </button>
                 </div>
               ))}
@@ -318,197 +306,168 @@ export default function App() {
           </div>
         </section>
 
-        {/* RIGHT COLUMN: Interactive Resolution Canvas */}
-        <section style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {/* Right Column: 2D Resolution Canvas */}
+        <section style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           
-          {/* Metrics & Overview Ribbon */}
+          {/* Top Summary Metrics Bar (Square 2D Cards) */}
           {resolutionResult && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
-              <div className="glass-panel" style={{ padding: '14px 18px' }}>
-                <span style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Records</span>
-                <div style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-main)', marginTop: '4px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+              <div className="sq-card" style={{ padding: '12px 16px' }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>
+                  Total Inputs
+                </div>
+                <div style={{ fontSize: '20px', fontWeight: '800', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>
                   {resolutionResult.total_records}
                 </div>
               </div>
 
-              <div className="glass-panel" style={{ padding: '14px 18px', borderLeft: '3px solid var(--accent-primary)' }}>
-                <span style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Unique Real Entities</span>
-                <div style={{ fontSize: '22px', fontWeight: '700', color: 'var(--accent-primary)', marginTop: '4px' }}>
+              <div className="sq-card" style={{ padding: '12px 16px', borderLeft: '3px solid #ffffff' }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>
+                  Resolved Unique
+                </div>
+                <div style={{ fontSize: '20px', fontWeight: '800', fontFamily: 'var(--font-mono)', marginTop: '2px', color: '#ffffff' }}>
                   {resolutionResult.unique_entities_count}
                 </div>
               </div>
 
-              <div className="glass-panel" style={{ padding: '14px 18px', borderLeft: '3px solid var(--status-match)' }}>
-                <span style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Merged Clusters</span>
-                <div style={{ fontSize: '22px', fontWeight: '700', color: 'var(--status-match)', marginTop: '4px' }}>
+              <div className="sq-card" style={{ padding: '12px 16px', borderLeft: '3px solid var(--status-match-border)' }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>
+                  Merged Clusters
+                </div>
+                <div style={{ fontSize: '20px', fontWeight: '800', fontFamily: 'var(--font-mono)', marginTop: '2px', color: 'var(--status-match-text)' }}>
                   {resolutionResult.merged_clusters_count}
                 </div>
               </div>
 
-              <div className="glass-panel" style={{ padding: '14px 18px' }}>
-                <span style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Singletons (No Merges)</span>
-                <div style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-muted)', marginTop: '4px' }}>
+              <div className="sq-card" style={{ padding: '12px 16px' }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>
+                  Singletons
+                </div>
+                <div style={{ fontSize: '20px', fontWeight: '800', fontFamily: 'var(--font-mono)', marginTop: '2px', color: 'var(--text-secondary)' }}>
                   {resolutionResult.singletons_count}
                 </div>
               </div>
             </div>
           )}
 
-          {/* View Tab Selector */}
-          <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '8px' }}>
+          {/* Tab Selector */}
+          <div style={{ display: 'flex', gap: '0px', borderBottom: '1px solid var(--border-light)' }}>
             <button 
               onClick={() => setActiveTab('clusters')}
               style={{
-                background: activeTab === 'clusters' ? 'var(--bg-card-subtle)' : 'transparent',
-                color: activeTab === 'clusters' ? 'var(--text-main)' : 'var(--text-dim)',
-                border: activeTab === 'clusters' ? '1px solid var(--border-active)' : '1px solid transparent',
-                borderRadius: '6px',
-                padding: '6px 14px',
-                fontSize: '13px',
-                fontWeight: '500',
+                background: activeTab === 'clusters' ? '#171717' : 'transparent',
+                color: activeTab === 'clusters' ? '#ffffff' : 'var(--text-secondary)',
+                border: '1px solid var(--border-light)',
+                borderBottom: activeTab === 'clusters' ? '1px solid #171717' : '1px solid var(--border-light)',
+                padding: '6px 16px',
+                fontSize: '11px',
+                fontWeight: '600',
                 cursor: 'pointer',
+                textTransform: 'uppercase',
+                fontFamily: 'var(--font-mono)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px'
               }}
             >
-              <GitMerge size={14} />
-              <span>Resolved Entity Clusters</span>
+              <GitMerge size={12} />
+              <span>Resolved Clusters</span>
             </button>
 
             <button 
               onClick={() => setActiveTab('pairwise')}
               style={{
-                background: activeTab === 'pairwise' ? 'var(--bg-card-subtle)' : 'transparent',
-                color: activeTab === 'pairwise' ? 'var(--text-main)' : 'var(--text-dim)',
-                border: activeTab === 'pairwise' ? '1px solid var(--border-active)' : '1px solid transparent',
-                borderRadius: '6px',
-                padding: '6px 14px',
-                fontSize: '13px',
-                fontWeight: '500',
+                background: activeTab === 'pairwise' ? '#171717' : 'transparent',
+                color: activeTab === 'pairwise' ? '#ffffff' : 'var(--text-secondary)',
+                border: '1px solid var(--border-light)',
+                borderLeft: 'none',
+                borderBottom: activeTab === 'pairwise' ? '1px solid #171717' : '1px solid var(--border-light)',
+                padding: '6px 16px',
+                fontSize: '11px',
+                fontWeight: '600',
                 cursor: 'pointer',
+                textTransform: 'uppercase',
+                fontFamily: 'var(--font-mono)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px'
               }}
             >
-              <ArrowRightLeft size={14} />
+              <ArrowRightLeft size={12} />
               <span>Pairwise Link Inspection ({resolutionResult?.pairwise_links?.length || 0})</span>
             </button>
           </div>
 
-          {/* TAB 1: BEAUTIFIED CLUSTERS & MERGED ENTITY CARDS */}
+          {/* TAB 1: 2D Square Clusters */}
           {activeTab === 'clusters' && resolutionResult && (
-            <div className="subtle-scroll" style={{ maxHeight: 'calc(100vh - 280px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {resolutionResult.entities.map((entity, idx) => {
+            <div className="sq-scroll" style={{ maxHeight: 'calc(100vh - 280px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {resolutionResult.entities.map((entity) => {
                 const isExpanded = expandedEntities[entity.entity_id];
                 return (
                   <div 
                     key={entity.entity_id}
-                    className="glass-panel"
+                    className="sq-card"
                     style={{
-                      border: entity.is_merged ? '1px solid var(--status-match-border)' : '1px solid var(--border-subtle)',
-                      background: entity.is_merged ? 'linear-gradient(180deg, rgba(16, 185, 129, 0.04) 0%, rgba(19, 21, 27, 0.95) 100%)' : 'var(--bg-card)',
-                      overflow: 'hidden',
-                      transition: 'all 0.2s ease'
+                      borderLeft: entity.is_merged ? '3px solid var(--status-match-border)' : '1px solid var(--border-light)',
+                      background: entity.is_merged ? '#0e1711' : '#0a0a0a'
                     }}
                   >
-                    {/* Header Banner */}
                     <div 
                       onClick={() => toggleExpand(entity.entity_id)}
                       style={{
-                        padding: '14px 18px',
+                        padding: '12px 14px',
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        cursor: 'pointer',
-                        userSelect: 'none'
+                        cursor: 'pointer'
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{
-                          width: '28px',
-                          height: '28px',
-                          borderRadius: '6px',
-                          background: entity.is_merged ? 'var(--status-match-bg)' : 'var(--bg-card-subtle)',
-                          color: entity.is_merged ? 'var(--status-match)' : 'var(--text-dim)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}>
-                          {entity.is_merged ? <CheckCircle2 size={16} /> : <Building2 size={16} />}
-                        </div>
-
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-main)' }}>
+                            <span style={{ fontSize: '13px', fontWeight: '700', color: '#ffffff' }}>
                               {entity.canonical_name}
                             </span>
-                            <span style={{
-                              fontSize: '10px',
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              fontWeight: '600',
-                              background: entity.is_merged ? 'rgba(16, 185, 129, 0.15)' : 'rgba(148, 163, 184, 0.1)',
-                              color: entity.is_merged ? 'var(--status-match)' : 'var(--text-dim)'
+                            <span className="sq-badge" style={{
+                              borderColor: entity.is_merged ? 'var(--status-match-border)' : 'var(--border-medium)',
+                              color: entity.is_merged ? 'var(--status-match-text)' : 'var(--text-secondary)'
                             }}>
                               {entity.is_merged ? `${entity.record_count} Records Merged` : 'Singleton'}
                             </span>
                           </div>
                           {entity.canonical_address && (
-                            <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>
-                              📍 {entity.canonical_address}
-                            </span>
+                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                              {entity.canonical_address}
+                            </div>
                           )}
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-dim)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                           {entity.entity_id}
                         </span>
-                        {isExpanded ? <ChevronDown size={16} color="var(--text-muted)" /> : <ChevronRight size={16} color="var(--text-muted)" />}
+                        {isExpanded ? <ChevronDown size={14} color="var(--text-secondary)" /> : <ChevronRight size={14} color="var(--text-secondary)" />}
                       </div>
                     </div>
 
-                    {/* Merged Inner Records Drawer */}
                     {isExpanded && (
-                      <div style={{ borderTop: '1px solid var(--border-subtle)', background: 'rgba(11, 12, 16, 0.5)', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <span style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                          Linked Multi-Source Fragments:
-                        </span>
-                        
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '10px' }}>
+                      <div style={{ borderTop: '1px solid var(--border-light)', background: '#000000', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ fontSize: '10px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
+                          Linked Multi-Source Records:
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '6px' }}>
                           {entity.records.map((r, rIdx) => (
-                            <div 
-                              key={rIdx}
-                              style={{
-                                background: 'var(--bg-card)',
-                                border: '1px solid var(--border-subtle)',
-                                borderRadius: '8px',
-                                padding: '10px 12px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '4px'
-                              }}
-                            >
+                            <div key={rIdx} style={{ background: '#0a0a0a', border: '1px solid var(--border-light)', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 {getSourceBadge(r.id)}
-                                <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-dim)' }}>
-                                  ID: {r.id}
-                                </span>
+                                <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>ID: {r.id}</span>
                               </div>
-                              <span style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text-main)', marginTop: '2px' }}>
-                                {r.name}
-                              </span>
+                              <div style={{ fontSize: '11px', fontWeight: '600', color: '#ffffff', marginTop: '2px' }}>{r.name}</div>
                               {r.addr ? (
-                                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                  {r.addr}
-                                </span>
+                                <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{r.addr}</div>
                               ) : (
-                                <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontStyle: 'italic' }}>
-                                  (No address specified)
-                                </span>
+                                <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>(No address specified)</div>
                               )}
                             </div>
                           ))}
@@ -521,12 +480,12 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB 2: DETAILED PAIRWISE FEATURE INSPECTOR */}
+          {/* TAB 2: Pairwise Link Inspection */}
           {activeTab === 'pairwise' && resolutionResult && (
-            <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '16px', maxHeight: 'calc(100vh - 280px)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '12px', maxHeight: 'calc(100vh - 280px)' }}>
               
-              {/* Pairwise Links Scrollable List */}
-              <div className="glass-panel subtle-scroll" style={{ overflowY: 'auto', padding: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {/* Pairwise Links Left List */}
+              <div className="sq-card sq-scroll" style={{ overflowY: 'auto', padding: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {resolutionResult.pairwise_links.map((link, lIdx) => {
                   const isSelected = selectedPair === link;
                   return (
@@ -534,175 +493,171 @@ export default function App() {
                       key={lIdx}
                       onClick={() => setSelectedPair(link)}
                       style={{
-                        padding: '10px',
-                        borderRadius: '6px',
-                        background: isSelected ? 'var(--bg-card-subtle)' : 'transparent',
-                        border: isSelected ? '1px solid var(--accent-primary)' : '1px solid transparent',
+                        padding: '8px 10px',
+                        background: isSelected ? '#171717' : '#0a0a0a',
+                        border: isSelected ? '1px solid #ffffff' : '1px solid var(--border-light)',
                         cursor: 'pointer',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '4px'
+                        gap: '2px'
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-dim)' }}>
+                        <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                           {link.source_id} ↔ {link.target_id}
                         </span>
                         <span style={{
                           fontSize: '11px',
                           fontWeight: '700',
                           fontFamily: 'var(--font-mono)',
-                          color: link.is_match ? 'var(--status-match)' : 'var(--text-dim)'
+                          color: link.is_match ? 'var(--status-match-text)' : 'var(--text-tertiary)'
                         }}>
                           {(link.probability * 100).toFixed(1)}%
                         </span>
                       </div>
-                      <span style={{ fontSize: '12px', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <div style={{ fontSize: '11px', color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {link.source_name}
-                      </span>
+                      </div>
                     </div>
                   );
                 })}
               </div>
 
-              {/* Selected Pair Deep Inspector Panel */}
+              {/* Selected Pair Deep Inspector */}
               {selectedPair ? (
-                <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '14px' }}>
+                <div className="sq-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  
+                  {/* Top Header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '10px' }}>
                     <div>
-                      <h3 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-main)' }}>
-                        Pairwise Link Analysis
-                      </h3>
-                      <p style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
-                        LightGBM Tree-Level Feature Vector Decomposition
-                      </p>
+                      <div style={{ fontSize: '13px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        Pairwise Link Decision Analysis
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                        Status: {selectedPair.consensus_status}
+                      </div>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'block' }}>Match Probability</span>
-                        <span style={{ fontSize: '18px', fontWeight: '700', fontFamily: 'var(--font-mono)', color: selectedPair.is_match ? 'var(--status-match)' : 'var(--text-dim)' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>Ensemble Score</div>
+                        <div style={{ fontSize: '16px', fontWeight: '800', fontFamily: 'var(--font-mono)', color: selectedPair.is_match ? 'var(--status-match-text)' : 'var(--text-secondary)' }}>
                           {(selectedPair.probability * 100).toFixed(2)}%
-                        </span>
+                        </div>
                       </div>
-                      <span style={{
-                        padding: '4px 10px',
-                        borderRadius: '6px',
-                        fontWeight: '700',
-                        fontSize: '11px',
-                        background: selectedPair.is_match ? 'var(--status-match-bg)' : 'rgba(148, 163, 184, 0.1)',
-                        color: selectedPair.is_match ? 'var(--status-match)' : 'var(--text-dim)'
+                      <span className="sq-badge" style={{
+                        borderColor: selectedPair.is_match ? 'var(--status-match-border)' : 'var(--border-medium)',
+                        color: selectedPair.is_match ? 'var(--status-match-text)' : 'var(--text-secondary)',
+                        padding: '4px 8px'
                       }}>
-                        {selectedPair.is_match ? 'MATCH (Merged)' : 'DISTINCT'}
+                        {selectedPair.is_match ? 'MATCH (MERGED)' : 'DISTINCT'}
                       </span>
                     </div>
                   </div>
 
-                  {/* Side by Side Comparison */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                    <div style={{ background: 'var(--bg-input)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                  {/* 2-Column Record Comparison */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div style={{ background: '#000000', border: '1px solid var(--border-light)', padding: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                         {getSourceBadge(selectedPair.source_id)}
-                        <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-dim)' }}>{selectedPair.source_id}</span>
+                        <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{selectedPair.source_id}</span>
                       </div>
-                      <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)' }}>{selectedPair.source_name}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{selectedPair.source_addr || '(No address)'}</div>
+                      <div style={{ fontSize: '12px', fontWeight: '600', color: '#ffffff' }}>{selectedPair.source_name}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{selectedPair.source_addr || '(No address)'}</div>
                     </div>
 
-                    <div style={{ background: 'var(--bg-input)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                    <div style={{ background: '#000000', border: '1px solid var(--border-light)', padding: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                         {getSourceBadge(selectedPair.target_id)}
-                        <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-dim)' }}>{selectedPair.target_id}</span>
+                        <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{selectedPair.target_id}</span>
                       </div>
-                      <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)' }}>{selectedPair.target_name}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{selectedPair.target_addr || '(No address)'}</div>
+                      <div style={{ fontSize: '12px', fontWeight: '600', color: '#ffffff' }}>{selectedPair.target_name}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{selectedPair.target_addr || '(No address)'}</div>
                     </div>
                   </div>
 
-                  {/* Feature Breakdown Bars */}
+                  {/* Dual Model Probability Cards */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    
+                    {/* LightGBM Model */}
+                    <div style={{ background: '#000000', border: '1px solid var(--border-light)', padding: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>
+                          1. LightGBM (Lexical/N-Gram)
+                        </span>
+                        <span className="sq-badge" style={{ borderColor: selectedPair.lgbm_is_match ? 'var(--status-match-border)' : 'var(--border-medium)', color: selectedPair.lgbm_is_match ? 'var(--status-match-text)' : 'var(--text-tertiary)' }}>
+                          {selectedPair.lgbm_is_match ? 'MATCH' : 'NO MATCH'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '16px', fontWeight: '800', fontFamily: 'var(--font-mono)' }}>
+                        {((selectedPair.lgbm_prob || 0) * 100).toFixed(1)}%
+                      </div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        Evaluates 11-D tree feature interactions (Jaccard, n-grams, legal suffix).
+                      </div>
+                    </div>
+
+                    {/* RoBERTa Model */}
+                    <div style={{ background: '#000000', border: '1px solid var(--border-light)', padding: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>
+                          2. RoBERTa (Semantic Embedding)
+                        </span>
+                        <span className="sq-badge" style={{ borderColor: selectedPair.roberta_is_match ? 'var(--status-match-border)' : 'var(--border-medium)', color: selectedPair.roberta_is_match ? 'var(--status-match-text)' : 'var(--text-tertiary)' }}>
+                          {selectedPair.roberta_is_match ? 'MATCH' : 'NO MATCH'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '16px', fontWeight: '800', fontFamily: 'var(--font-mono)' }}>
+                        {((selectedPair.roberta_sim || 0) * 100).toFixed(1)}%
+                      </div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        Evaluates deep neural embedding cosine similarity in 768-D dense space.
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2D Metrics Breakdown */}
                   <div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-                      {/* LightGBM Card */}
-                      <div style={{ background: 'var(--bg-card-subtle)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                          <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--accent-primary)' }}>LightGBM Classifier</span>
-                          <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '4px', background: selectedPair.lgbm_is_match ? 'var(--status-match-bg)' : 'rgba(148,163,184,0.1)', color: selectedPair.lgbm_is_match ? 'var(--status-match)' : 'var(--text-dim)' }}>
-                            {selectedPair.lgbm_is_match ? 'MATCH' : 'NO MATCH'}
-                          </span>
-                        </div>
-                        <div style={{ fontSize: '16px', fontWeight: '700', fontFamily: 'var(--font-mono)', color: 'var(--text-main)' }}>
-                          {((selectedPair.lgbm_prob || selectedPair.probability) * 100).toFixed(1)}%
-                        </div>
-                      </div>
-
-                      {/* RoBERTa Transformer Card */}
-                      <div style={{ background: 'var(--bg-card-subtle)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                          <span style={{ fontSize: '12px', fontWeight: '600', color: '#ec4899' }}>RoBERTa Embedding</span>
-                          <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '4px', background: selectedPair.roberta_is_match ? 'rgba(236,72,153,0.15)' : 'rgba(148,163,184,0.1)', color: selectedPair.roberta_is_match ? '#ec4899' : 'var(--text-dim)' }}>
-                            {selectedPair.roberta_is_match ? 'MATCH' : 'NO MATCH'}
-                          </span>
-                        </div>
-                        <div style={{ fontSize: '16px', fontWeight: '700', fontFamily: 'var(--font-mono)', color: 'var(--text-main)' }}>
-                          {((selectedPair.roberta_sim || 0) * 100).toFixed(1)}%
-                        </div>
-                      </div>
+                    <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                      Decomposed Feature Metrics:
                     </div>
-
-                    <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                      Computed NLP & Semantic Metrics:
-                    </span>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '10px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
                       
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                          <span style={{ color: 'var(--text-muted)' }}>TF-IDF Cosine Similarity</span>
-                          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-main)' }}>{selectedPair.features.tfidf_sim}</span>
-                        </div>
-                        <div style={{ height: '6px', background: 'var(--bg-input)', borderRadius: '3px', overflow: 'hidden' }}>
-                          <div style={{ width: `${selectedPair.features.tfidf_sim * 100}%`, height: '100%', background: 'var(--accent-primary)' }}></div>
-                        </div>
+                      <div style={{ background: '#000000', border: '1px solid var(--border-light)', padding: '8px' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>TF-IDF COSINE</div>
+                        <div style={{ fontSize: '13px', fontWeight: '700', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>{selectedPair.features.tfidf_sim}</div>
                       </div>
 
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                          <span style={{ color: 'var(--text-muted)' }}>Name Token Jaccard</span>
-                          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-main)' }}>{selectedPair.features.name_jaccard}</span>
-                        </div>
-                        <div style={{ height: '6px', background: 'var(--bg-input)', borderRadius: '3px', overflow: 'hidden' }}>
-                          <div style={{ width: `${selectedPair.features.name_jaccard * 100}%`, height: '100%', background: '#a855f7' }}></div>
-                        </div>
+                      <div style={{ background: '#000000', border: '1px solid var(--border-light)', padding: '8px' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>NAME JACCARD</div>
+                        <div style={{ fontSize: '13px', fontWeight: '700', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>{selectedPair.features.name_jaccard}</div>
                       </div>
 
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                          <span style={{ color: 'var(--text-muted)' }}>Character 3-Gram Overlap</span>
-                          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-main)' }}>{selectedPair.features.name_3gram}</span>
-                        </div>
-                        <div style={{ height: '6px', background: 'var(--bg-input)', borderRadius: '3px', overflow: 'hidden' }}>
-                          <div style={{ width: `${selectedPair.features.name_3gram * 100}%`, height: '100%', background: '#ec4899' }}></div>
-                        </div>
+                      <div style={{ background: '#000000', border: '1px solid var(--border-light)', padding: '8px' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>CHAR 3-GRAM</div>
+                        <div style={{ fontSize: '13px', fontWeight: '700', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>{selectedPair.features.name_3gram}</div>
                       </div>
 
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                          <span style={{ color: 'var(--text-muted)' }}>Address Token Jaccard</span>
-                          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-main)' }}>{selectedPair.features.addr_jaccard}</span>
-                        </div>
-                        <div style={{ height: '6px', background: 'var(--bg-input)', borderRadius: '3px', overflow: 'hidden' }}>
-                          <div style={{ width: `${selectedPair.features.addr_jaccard * 100}%`, height: '100%', background: '#f59e0b' }}></div>
-                        </div>
+                      <div style={{ background: '#000000', border: '1px solid var(--border-light)', padding: '8px' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>ADDR JACCARD</div>
+                        <div style={{ fontSize: '13px', fontWeight: '700', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>{selectedPair.features.addr_jaccard}</div>
+                      </div>
+
+                      <div style={{ background: '#000000', border: '1px solid var(--border-light)', padding: '8px' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>SUBSTRING</div>
+                        <div style={{ fontSize: '13px', fontWeight: '700', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>{selectedPair.features.is_substr ? 'TRUE' : 'FALSE'}</div>
+                      </div>
+
+                      <div style={{ background: '#000000', border: '1px solid var(--border-light)', padding: '8px' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>EXACT NAME</div>
+                        <div style={{ fontSize: '13px', fontWeight: '700', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>{selectedPair.features.exact_name ? 'TRUE' : 'FALSE'}</div>
                       </div>
 
                     </div>
                   </div>
 
                 </div>
-              ) : (
-                <div className="glass-panel" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)' }}>
-                  Select a pairwise comparison from the left
-                </div>
-              )}
+              ) : null}
             </div>
           )}
 

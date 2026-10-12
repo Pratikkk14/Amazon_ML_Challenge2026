@@ -1,28 +1,32 @@
 :root {
-  --bg-main: #0b0c10;
-  --bg-card: #13151b;
-  --bg-card-subtle: #181b23;
-  --bg-input: #1b1e28;
-  --border-subtle: #232734;
-  --border-active: #383e52;
+  /* AWS Builder Center Inspired Clean Monochromatic 2D Palette */
+  --bg-page: #000000;
+  --bg-surface: #0a0a0a;
+  --bg-surface-secondary: #121212;
+  --bg-input: #000000;
   
-  --accent-primary: #6366f1;
-  --accent-primary-hover: #4f46e5;
-  --accent-glow: rgba(99, 102, 241, 0.15);
+  --border-light: #262626;
+  --border-medium: #3e3e3e;
+  --border-highlight: #ffffff;
   
-  --status-match: #10b981;
-  --status-match-bg: rgba(16, 185, 129, 0.1);
-  --status-match-border: rgba(16, 185, 129, 0.25);
+  --text-primary: #ffffff;
+  --text-secondary: #a3a3a3;
+  --text-tertiary: #525252;
   
-  --status-singleton: #94a3b8;
-  --status-singleton-bg: rgba(148, 163, 184, 0.08);
+  --status-match-bg: #142819;
+  --status-match-border: #22c55e;
+  --status-match-text: #4ade80;
   
-  --text-main: #f1f5f9;
-  --text-muted: #94a3b8;
-  --text-dim: #64748b;
-  
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+  --status-dim-bg: #1a1a1a;
+  --status-dim-border: #404040;
+  --status-dim-text: #a3a3a3;
+
+  --status-disagree-bg: #291800;
+  --status-disagree-border: #eab308;
+  --status-disagree-text: #facc15;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 * {
@@ -32,107 +36,146 @@
 }
 
 body {
-  background-color: var(--bg-main);
-  color: var(--text-main);
+  background-color: var(--bg-page);
+  color: var(--text-primary);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
-  overflow-x: hidden;
+  line-height: 1.5;
 }
 
-/* Glass & Card styling */
-.glass-panel {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  backdrop-filter: blur(8px);
+/* 2D Flat Square Card (No Glassmorphism, Sharp Borders) */
+.sq-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: 0px;
 }
 
-.subtle-scroll::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+.sq-card-secondary {
+  background-color: var(--bg-surface-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: 0px;
 }
 
-.subtle-scroll::-webkit-scrollbar-track {
-  background: var(--bg-card);
+.sq-border-b {
+  border-bottom: 1px solid var(--border-light);
 }
 
-.subtle-scroll::-webkit-scrollbar-thumb {
-  background: var(--border-active);
-  border-radius: 3px;
+.sq-border-t {
+  border-top: 1px solid var(--border-light);
 }
 
-.btn-primary {
-  background: var(--accent-primary);
-  color: #fff;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-weight: 500;
-  font-size: 13px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+.sq-border-r {
+  border-right: 1px solid var(--border-light);
 }
 
-.btn-primary:hover:not(:disabled) {
-  background: var(--accent-primary-hover);
-  box-shadow: 0 0 16px var(--accent-glow);
-  transform: translateY(-1px);
+.sq-border-l {
+  border-left: 1px solid var(--border-light);
 }
 
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-ghost {
-  background: transparent;
-  color: var(--text-muted);
-  border: 1px solid var(--border-subtle);
-  padding: 7px 14px;
-  border-radius: 8px;
-  font-size: 13px;
+/* AWS Builder Center Style Minimalist Buttons */
+.sq-btn-primary {
+  background-color: #ffffff;
+  color: #000000;
+  border: 1px solid #ffffff;
+  border-radius: 0px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 6px 14px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  transition: all 0.15s ease;
+  text-transform: uppercase;
+  transition: background-color 0.1s ease, color 0.1s ease;
 }
 
-.btn-ghost:hover {
-  color: var(--text-main);
-  border-color: var(--border-active);
-  background: var(--bg-card-subtle);
+.sq-btn-primary:hover:not(:disabled) {
+  background-color: #d4d4d4;
+  border-color: #d4d4d4;
 }
 
-.badge {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 6px;
+.sq-btn-primary:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.sq-btn-secondary {
+  background-color: transparent;
+  color: #ffffff;
+  border: 1px solid var(--border-medium);
+  border-radius: 0px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 12px;
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  transition: border-color 0.1s ease, background-color 0.1s ease;
 }
 
-.badge-source1 {
-  background: rgba(99, 102, 241, 0.15);
-  color: #818cf8;
-  border: 1px solid rgba(99, 102, 241, 0.3);
+.sq-btn-secondary:hover {
+  border-color: #ffffff;
+  background-color: #171717;
 }
 
-.badge-source2 {
-  background: rgba(236, 72, 153, 0.15);
-  color: #f472b6;
-  border: 1px solid rgba(236, 72, 153, 0.3);
+/* 2D Monochromatic Badges */
+.sq-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: 0px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border-medium);
+  background-color: #171717;
+  color: #d4d4d4;
 }
 
-.badge-source3 {
-  background: rgba(245, 158, 11, 0.15);
-  color: #fbbf24;
-  border: 1px solid rgba(245, 158, 11, 0.3);
+.sq-badge-src1 {
+  border-color: #525252;
+  color: #ffffff;
+  background-color: #1a1a1a;
+}
+
+.sq-badge-src2 {
+  border-color: #737373;
+  color: #e5e5e5;
+  background-color: #262626;
+}
+
+.sq-badge-src3 {
+  border-color: #a3a3a3;
+  color: #ffffff;
+  background-color: #333333;
+}
+
+/* Precision Scrollbars */
+.sq-scroll::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.sq-scroll::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+
+.sq-scroll::-webkit-scrollbar-thumb {
+  background: #262626;
+}
+
+.sq-scroll::-webkit-scrollbar-thumb:hover {
+  background: #525252;
+}
+
+/* Sliders */
+input[type="range"] {
+  accent-color: #ffffff;
 }
